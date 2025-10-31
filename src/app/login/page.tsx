@@ -81,7 +81,7 @@ export default function LoginPage() {
               },
             }}
             providers={["github", "google", "twitter", "spotify"]}
-            redirectTo={`${window.location.origin}/`}
+            redirectTo={`${window.location.origin}/auth/callback`}
             providerScopes={{
               github: "user:email",
               google:

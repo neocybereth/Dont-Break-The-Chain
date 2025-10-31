@@ -85,25 +85,24 @@ Visit `http://localhost:3000` and you're done! The app will:
 
 Want Google, GitHub, or Apple sign-in?
 
-### Quick Enable (after configuring in Supabase):
-
-Edit `src/app/login/page.tsx` and uncomment this line:
-
-```typescript
-// Change this:
-providers={[]}
-
-// To this:
-providers={["google", "github", "apple"]}
-```
-
 ### Configuration Required:
+
+**Step 1: Add Redirect URLs in Supabase**
+
+1. Go to Supabase Dashboard → Authentication → URL Configuration
+2. Add these URLs to **Redirect URLs**:
+   - `http://localhost:3000/auth/callback` (for local development)
+   - `https://yourdomain.com/auth/callback` (for production, replace with your actual domain)
+
+**Step 2: Enable OAuth Providers**
 
 Each provider needs setup in Supabase Dashboard → Authentication → Providers:
 
 - **GitHub** (easiest, 5 min) - See `OAUTH_SETUP_QUICKSTART.md`
 - **Google** (10 min) - See `OAUTH_SETUP_QUICKSTART.md`
-- **Apple** (hard, requires $99/year Apple Developer account)
+- **Twitter/Spotify** (similar process)
+
+The app is already configured to use these providers!
 
 ## That's It!
 
