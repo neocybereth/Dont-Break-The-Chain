@@ -6,6 +6,8 @@ import confetti from "canvas-confetti";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
+export const dynamic = "force-dynamic";
+
 interface Streak {
   id: string;
   name: string;
