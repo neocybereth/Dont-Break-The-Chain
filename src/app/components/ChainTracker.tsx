@@ -9,6 +9,9 @@ interface DayData {
   checked: boolean;
 }
 
+const DAYS_TO_DISPLAY = 42; // 6 weeks of tracking history
+const MILLISECONDS_PER_DAY = 86400000;
+
 export default function ChainTracker() {
   const [viewMode, setViewMode] = useState<ViewMode>('daily');
   
@@ -17,7 +20,7 @@ export default function ChainTracker() {
     const today = new Date();
     const daysData: DayData[] = [];
     
-    for (let i = 41; i >= 0; i--) {
+    for (let i = DAYS_TO_DISPLAY - 1; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       daysData.push({
@@ -41,7 +44,7 @@ export default function ChainTracker() {
 
   const getWeekNumber = (date: Date): number => {
     const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
-    const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
+    const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / MILLISECONDS_PER_DAY;
     return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
   };
 
