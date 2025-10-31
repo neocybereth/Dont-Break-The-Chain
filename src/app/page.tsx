@@ -254,86 +254,87 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-amber-50 via-orange-50 to-red-50 font-sans p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-12 relative">
-          <h1 className="text-5xl font-bold text-gray-900 mb-2">
-            Don&apos;t Break the Chain
-          </h1>
-          <p className="text-gray-600 text-lg mb-4">
-            Build your streaks, one day at a time
-          </p>
-
-          {/* User info and sign out button */}
-          <div className="absolute top-0 right-0 flex items-center gap-4">
-            {user && (
-              <>
-                <span className="text-sm text-gray-600">{user.email}</span>
-                <button
-                  onClick={handleSignOut}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Sign Out
-                </button>
-              </>
-            )}
+    <>
+      {/* User info and sign out button */}
+      <div className="absolute top-5 right-10 flex items-center gap-4">
+        {user && (
+          <div>
+            <span className="text-sm text-gray-600 mr-2">{user.email}</span>
+            <button
+              onClick={handleSignOut}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Sign Out
+            </button>
           </div>
-        </div>
+        )}
+      </div>
+      <div className="min-h-screen bg-linear-to-br from-amber-50 via-orange-50 to-red-50 font-sans p-8">
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-12 relative">
+            <h1 className="text-5xl font-bold text-gray-900 mb-2">
+              Don&apos;t Break the Chain
+            </h1>
+            <p className="text-gray-600 text-lg mb-4">
+              Build your streaks, one day at a time
+            </p>
+          </div>
 
-        {/* Streaks List */}
-        <div className="mb-8 space-y-4">
-          {isLoading ? (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-green-500"></div>
-              <p className="mt-4 text-gray-600">Loading your streaks...</p>
-            </div>
-          ) : (
-            streaks.map((streak) => {
-              const currentStreak = getStreakCount(streak.completedDates);
-              return (
-                <div
-                  key={streak.id}
-                  className="bg-white rounded-2xl shadow-lg p-6 transition-all duration-300 hover:shadow-xl animate-slideDown"
-                >
-                  <div className="flex items-center gap-6">
-                    <div className="shrink-0 w-48">
-                      <h3 className="text-2xl font-semibold text-gray-900">
-                        {streak.name}
-                      </h3>
-                      {currentStreak > 0 && (
-                        <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-linear-to-r from-red-100 to-orange-100 rounded-full">
-                          <span className="text-2xl">🔥</span>
-                          <span className="text-sm font-bold text-red-600">
-                            {currentStreak} day{currentStreak !== 1 ? "s" : ""}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex gap-3 flex-1 justify-end">
-                      {dateBoxes.map((date) => {
-                        const isToday = date === todayString;
-                        const isCompleted = streak.completedDates.has(date);
-                        const dateObj = new Date(date);
-                        const dayName = dateObj.toLocaleDateString("en-US", {
-                          weekday: "short",
-                        });
-
-                        return (
-                          <div
-                            key={date}
-                            className="flex flex-col items-center"
-                          >
-                            <span className="text-xs text-gray-500 mb-1">
-                              {dayName}
+          {/* Streaks List */}
+          <div className="mb-8 space-y-4">
+            {isLoading ? (
+              <div className="text-center py-12">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-green-500"></div>
+                <p className="mt-4 text-gray-600">Loading your streaks...</p>
+              </div>
+            ) : (
+              streaks.map((streak) => {
+                const currentStreak = getStreakCount(streak.completedDates);
+                return (
+                  <div
+                    key={streak.id}
+                    className="bg-white rounded-2xl shadow-lg p-6 transition-all duration-300 hover:shadow-xl animate-slideDown"
+                  >
+                    <div className="flex items-center gap-6">
+                      <div className="shrink-0 w-48">
+                        <h3 className="text-2xl font-semibold text-gray-900">
+                          {streak.name}
+                        </h3>
+                        {currentStreak > 0 && (
+                          <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-linear-to-r from-red-100 to-orange-100 rounded-full">
+                            <span className="text-2xl">🔥</span>
+                            <span className="text-sm font-bold text-red-600">
+                              {currentStreak} day
+                              {currentStreak !== 1 ? "s" : ""}
                             </span>
-                            <button
-                              onClick={(e) =>
-                                isToday &&
-                                toggleDate(streak.id, date, e.currentTarget)
-                              }
-                              disabled={!isToday}
-                              className={`
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-3 flex-1 justify-end">
+                        {dateBoxes.map((date) => {
+                          const isToday = date === todayString;
+                          const isCompleted = streak.completedDates.has(date);
+                          const dateObj = new Date(date);
+                          const dayName = dateObj.toLocaleDateString("en-US", {
+                            weekday: "short",
+                          });
+
+                          return (
+                            <div
+                              key={date}
+                              className="flex flex-col items-center"
+                            >
+                              <span className="text-xs text-gray-500 mb-1">
+                                {dayName}
+                              </span>
+                              <button
+                                onClick={(e) =>
+                                  isToday &&
+                                  toggleDate(streak.id, date, e.currentTarget)
+                                }
+                                disabled={!isToday}
+                                className={`
                             relative transition-all duration-200
                             ${
                               isToday
@@ -347,59 +348,60 @@ export default function Home() {
                             }
                             rounded-lg
                           `}
-                            >
-                              {isCompleted && (
-                                <svg
-                                  viewBox="0 0 100 100"
-                                  className="absolute inset-0 w-full h-full p-2"
-                                >
-                                  <path
-                                    d="M 20 20 L 80 80 M 80 20 L 20 80"
-                                    stroke="#d1fae5"
-                                    strokeWidth="12"
-                                    strokeLinecap="round"
-                                    className="drop-shadow-lg"
-                                  />
-                                  <path
-                                    d="M 20 20 L 80 80 M 80 20 L 20 80"
-                                    stroke="#16a34a"
-                                    strokeWidth="10"
-                                    strokeLinecap="round"
-                                  />
-                                </svg>
-                              )}
-                            </button>
-                          </div>
-                        );
-                      })}
+                              >
+                                {isCompleted && (
+                                  <svg
+                                    viewBox="0 0 100 100"
+                                    className="absolute inset-0 w-full h-full p-2"
+                                  >
+                                    <path
+                                      d="M 20 20 L 80 80 M 80 20 L 20 80"
+                                      stroke="#d1fae5"
+                                      strokeWidth="12"
+                                      strokeLinecap="round"
+                                      className="drop-shadow-lg"
+                                    />
+                                    <path
+                                      d="M 20 20 L 80 80 M 80 20 L 20 80"
+                                      stroke="#16a34a"
+                                      strokeWidth="10"
+                                      strokeLinecap="round"
+                                    />
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+                );
+              })
+            )}
+          </div>
 
-        {/* Input Field */}
-        <div
-          className={`
+          {/* Input Field */}
+          <div
+            className={`
             flex justify-center items-center transition-all duration-500
             ${streaks.length === 0 ? "min-h-[50vh]" : ""}
             ${isAdding ? "opacity-0 -translate-y-8" : "opacity-100"}
           `}
-        >
-          <div className="w-full max-w-2xl">
-            <input
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="What habit do you want to build?"
-              className="w-full px-8 py-6 text-2xl text-center text-black rounded-2xl border-2 border-gray-300 bg-white focus:border-green-500 focus:outline-none focus:ring-4 focus:ring-green-100 shadow-lg transition-all duration-200 placeholder:text-gray-400"
-            />
+          >
+            <div className="w-full max-w-2xl">
+              <input
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="What habit do you want to build?"
+                className="w-full px-8 py-6 text-2xl text-center text-black rounded-2xl border-2 border-gray-300 bg-white focus:border-green-500 focus:outline-none focus:ring-4 focus:ring-green-100 shadow-lg transition-all duration-200 placeholder:text-gray-400"
+              />
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -78,32 +78,20 @@ export default function LoginPage() {
                 input: "auth-input",
               },
             }}
-            // Enable OAuth providers here after configuring them in Supabase:
-            // providers={["google", "github", "apple"]}
-            providers={[]}
+            providers={["github", "google", "twitter", "spotify"]}
             redirectTo={`${window.location.origin}/`}
             providerScopes={{
               github: "user:email",
+              google:
+                "https://www.googleapis.com/auth/userinfo.email, https://www.googleapis.com/auth/userinfo.profile",
             }}
           />
         </div>
-        
+
         <p className="text-center text-sm text-gray-600 mt-6">
           By signing in, you agree to build consistent habits 💪
         </p>
-        
-        <div className="mt-4 p-4 bg-blue-50 rounded-lg text-sm text-gray-700">
-          <p className="font-semibold mb-2">Want social login?</p>
-          <p>
-            To enable Google, GitHub, or Apple sign-in, configure the providers
-            in your Supabase dashboard, then uncomment the providers line in{" "}
-            <code className="bg-white px-2 py-1 rounded">
-              src/app/login/page.tsx
-            </code>
-          </p>
-        </div>
       </div>
     </div>
   );
 }
-
