@@ -12,7 +12,24 @@ interface Streak {
   id: string;
   name: string;
   completedDates: Set<string>;
+  color?: string;
 }
+
+// Color palette for streaks
+const STREAK_COLORS = [
+  "#ef4444", // red
+  "#3b82f6", // blue
+  "#10b981", // green
+  "#a855f7", // purple
+  "#f97316", // orange
+  "#ec4899", // pink
+  "#14b8a6", // teal
+  "#f59e0b", // amber
+  "#8b5cf6", // violet
+  "#06b6d4", // cyan
+  "#84cc16", // lime
+  "#f43f5e", // rose
+];
 
 export default function Home() {
   const router = useRouter();
@@ -22,6 +39,10 @@ export default function Home() {
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [windowDimensions, setWindowDimensions] = useState({
+    width: 0,
+    height: 0,
+  });
 
   // Check authentication on mount
   useEffect(() => {
@@ -70,10 +91,11 @@ export default function Home() {
       if (error) {
         console.error("Error loading streaks:", error);
       } else if (data) {
-        const loadedStreaks = data.map((streak) => ({
+        const loadedStreaks = data.map((streak, index) => ({
           id: streak.id,
           name: streak.name,
           completedDates: new Set<string>(streak.completed_dates || []),
+          color: STREAK_COLORS[index % STREAK_COLORS.length],
         }));
         setStreaks(loadedStreaks);
       }
@@ -90,6 +112,25 @@ export default function Home() {
       loadStreaks();
     }
   }, [user, loadStreaks]);
+
+  // Handle window resize for chain positioning
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    // Set initial dimensions
+    handleResize();
+
+    // Add event listener
+    window.addEventListener("resize", handleResize);
+
+    // Cleanup
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const handleAddStreak = async () => {
     if (inputValue.trim() && user) {
@@ -119,6 +160,7 @@ export default function Home() {
                 id: data.id,
                 name: data.name,
                 completedDates: new Set(data.completed_dates || []),
+                color: STREAK_COLORS[streaks.length % STREAK_COLORS.length],
               },
               ...streaks,
             ]);
@@ -158,16 +200,19 @@ export default function Home() {
       newDates.delete(date);
     } else {
       newDates.add(date);
-      // Trigger confetti!
+      // Trigger confetti with streak color!
       const rect = button.getBoundingClientRect();
       const x = (rect.left + rect.width / 2) / window.innerWidth;
       const y = (rect.top + rect.height / 2) / window.innerHeight;
+
+      // Generate color variants based on the streak color
+      const baseColor = streak.color || "#16a34a";
 
       confetti({
         particleCount: 100,
         spread: 70,
         origin: { x, y },
-        colors: ["#16a34a", "#22c55e", "#86efac"],
+        colors: [baseColor, "#ffffff", "#ffd700"],
         ticks: 200,
       });
     }
@@ -203,24 +248,37 @@ export default function Home() {
   const getStreakCount = (completedDates: Set<string>) => {
     if (completedDates.size === 0) return 0;
 
-    const dates = Array.from(completedDates)
-      .map((d) => new Date(d))
-      .sort((a, b) => b.getTime() - a.getTime());
-
-    let streak = 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    for (let i = 0; i < dates.length; i++) {
-      const expectedDate = new Date(today);
-      expectedDate.setDate(today.getDate() - i);
-      expectedDate.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
 
-      const currentDate = new Date(dates[i]);
-      currentDate.setHours(0, 0, 0, 0);
+    // Check if today or yesterday is completed to have an active streak
+    const todayString = today.toISOString().split("T")[0];
+    const yesterdayString = yesterday.toISOString().split("T")[0];
 
-      if (currentDate.getTime() === expectedDate.getTime()) {
+    let streak = 0;
+    let checkDate = new Date(today);
+
+    // If today is completed, start from today; otherwise start from yesterday
+    if (completedDates.has(todayString)) {
+      // Start counting from today
+      checkDate = new Date(today);
+    } else if (completedDates.has(yesterdayString)) {
+      // Start counting from yesterday (grace period)
+      checkDate = new Date(yesterday);
+    } else {
+      // No recent activity, streak is 0
+      return 0;
+    }
+
+    // Count consecutive days backward
+    while (true) {
+      const dateString = checkDate.toISOString().split("T")[0];
+      if (completedDates.has(dateString)) {
         streak++;
+        checkDate.setDate(checkDate.getDate() - 1);
       } else {
         break;
       }
@@ -243,6 +301,125 @@ export default function Home() {
   const todayString = new Date().toISOString().split("T")[0];
   const dateBoxes = getDateBoxes();
 
+  // Generate chains - one chain per streak wrapping around the window
+  const generateChains = () => {
+    const chains: Array<{
+      color: string;
+      links: Array<{
+        x: number;
+        y: number;
+        rotation: number;
+        isHorizontal: boolean;
+      }>;
+      zIndex: number;
+    }> = [];
+
+    const linkWidth = 25; // Width of each chain link (50% smaller)
+    const linkHeight = 15; // Height of each chain link (50% smaller)
+    const padding = 10; // Distance from edge (closer to window edge)
+
+    // Process each streak
+    streaks.forEach((streak, streakIndex) => {
+      const streakCount = getStreakCount(streak.completedDates);
+      const color = streak.color || "#gray";
+
+      if (streakCount === 0) return;
+
+      const links: Array<{
+        x: number;
+        y: number;
+        rotation: number;
+        isHorizontal: boolean;
+      }> = [];
+
+      // Add a link for each day in the streak, wrapping around the window
+      // All chains start from the same position (no offset)
+      for (let i = 0; i < streakCount; i++) {
+        const position = calculateChainLinkPosition(
+          i,
+          linkWidth,
+          linkHeight,
+          padding // Same padding for all chains so they start at the same spot
+        );
+        links.push(position);
+      }
+
+      chains.push({
+        color,
+        links,
+        zIndex: streaks.length - streakIndex, // First streak has highest z-index
+      });
+    });
+
+    return chains;
+  };
+
+  // Calculate position for each link going clockwise from top center
+  const calculateChainLinkPosition = (
+    index: number,
+    linkWidth: number,
+    linkHeight: number,
+    padding: number
+  ) => {
+    if (windowDimensions.width === 0 || windowDimensions.height === 0) {
+      return { x: 0, y: 0, rotation: 0, isHorizontal: true };
+    }
+
+    const width = windowDimensions.width;
+    const height = windowDimensions.height;
+
+    // Calculate perimeter
+    const topWidth = width - padding * 2;
+    const rightHeight = height - padding * 2;
+    const bottomWidth = width - padding * 2;
+    const leftHeight = height - padding * 2;
+    const perimeter = topWidth + rightHeight + bottomWidth + leftHeight;
+
+    // Calculate spacing between links (they interlock, so alternate positioning)
+    const spacing = linkWidth * 0.8; // Links overlap slightly to interlock
+    const position = (index * spacing) % perimeter;
+
+    // Determine which side and position
+    if (position < topWidth) {
+      // Top edge (left to right) - horizontal links
+      return {
+        x: width / 2 - topWidth / 2 + position,
+        y: padding,
+        rotation: 0,
+        isHorizontal: true,
+      };
+    } else if (position < topWidth + rightHeight) {
+      // Right edge (top to bottom) - vertical links
+      const yPos = position - topWidth;
+      return {
+        x: width - padding,
+        y: padding + yPos,
+        rotation: 90,
+        isHorizontal: false,
+      };
+    } else if (position < topWidth + rightHeight + bottomWidth) {
+      // Bottom edge (right to left) - horizontal links
+      const xPos = position - topWidth - rightHeight;
+      return {
+        x: width - padding - xPos,
+        y: height - padding,
+        rotation: 0,
+        isHorizontal: true,
+      };
+    } else {
+      // Left edge (bottom to top) - vertical links
+      const yPos = position - topWidth - rightHeight - bottomWidth;
+      return {
+        x: padding,
+        y: height - padding - yPos,
+        rotation: 90,
+        isHorizontal: false,
+      };
+    }
+  };
+
+  const chains = generateChains();
+
   // Show loading while checking authentication
   if (isAuthChecking) {
     return (
@@ -257,11 +434,128 @@ export default function Home() {
 
   return (
     <>
+      {/* Chain Links Visualization */}
+      <div className="fixed inset-0 pointer-events-none">
+        {chains.map((chain, chainIndex) => (
+          <div
+            key={chainIndex}
+            className="absolute inset-0"
+            style={{ zIndex: 40 + chain.zIndex }}
+          >
+            {chain.links.map((link, linkIndex) => {
+              // Offset chains perpendicular to the edge they're on
+              const offsetAmount = chainIndex * 15; // 15px offset per chain
+
+              // Calculate offset based on orientation
+              // Horizontal edges: offset vertically (y-axis)
+              // Vertical edges: offset horizontally (x-axis)
+              const xOffset = link.isHorizontal ? 0 : offsetAmount;
+              const yOffset = link.isHorizontal ? offsetAmount : 0;
+
+              return (
+                <div
+                  key={linkIndex}
+                  className="absolute transition-all duration-300"
+                  style={{
+                    left: `${link.x + xOffset}px`,
+                    top: `${link.y + yOffset}px`,
+                    transform: `translate(-50%, -50%)`,
+                  }}
+                >
+                  {/* Realistic Chain link SVG - 50% smaller */}
+                  <svg
+                    width="30"
+                    height="20"
+                    viewBox="0 0 30 20"
+                    className="drop-shadow-md"
+                    style={{
+                      transform: `rotate(${link.rotation}deg)`,
+                    }}
+                  >
+                    {/* Outer ring - creates the chain link shape */}
+                    <ellipse
+                      cx="15"
+                      cy="10"
+                      rx="10"
+                      ry="6"
+                      fill="none"
+                      stroke={chain.color}
+                      strokeWidth="3"
+                      opacity="0.85"
+                    />
+                    {/* Inner highlight for 3D effect */}
+                    <ellipse
+                      cx="15"
+                      cy="9"
+                      rx="8.5"
+                      ry="5"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="1"
+                      opacity="0.3"
+                    />
+                    {/* Shadow/depth on bottom */}
+                    <ellipse
+                      cx="15"
+                      cy="11"
+                      rx="8.5"
+                      ry="5"
+                      fill="none"
+                      stroke="black"
+                      strokeWidth="0.5"
+                      opacity="0.15"
+                    />
+                    {/* Left connecting bar */}
+                    <rect
+                      x="4"
+                      y="7"
+                      width="4"
+                      height="6"
+                      fill={chain.color}
+                      opacity="0.85"
+                      rx="1"
+                    />
+                    {/* Right connecting bar */}
+                    <rect
+                      x="22"
+                      y="7"
+                      width="4"
+                      height="6"
+                      fill={chain.color}
+                      opacity="0.85"
+                      rx="1"
+                    />
+                    {/* Highlight on connecting bars */}
+                    <rect
+                      x="4"
+                      y="7"
+                      width="4"
+                      height="2"
+                      fill="white"
+                      opacity="0.2"
+                      rx="1"
+                    />
+                    <rect
+                      x="22"
+                      y="7"
+                      width="4"
+                      height="2"
+                      fill="white"
+                      opacity="0.2"
+                      rx="1"
+                    />
+                  </svg>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+
       {/* User info and sign out button */}
-      <div className="absolute top-5 right-10 flex items-center gap-4">
+      <div className="absolute top-5 right-10 mt-10 mr-5 flex items-center gap-4 z-10">
         {user && (
           <div>
-            <span className="text-sm text-gray-600 mr-2">{user.email}</span>
             <button
               onClick={handleSignOut}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -274,7 +568,7 @@ export default function Home() {
       <div className="min-h-screen bg-linear-to-br from-amber-50 via-orange-50 to-red-50 font-sans p-8">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <div className="text-center mb-12 relative">
+          <div className="text-center mt-5 mb-12 relative">
             <h1 className="text-5xl font-bold text-gray-900 mb-2">
               Don&apos;t Break the Chain
             </h1>
@@ -297,21 +591,29 @@ export default function Home() {
                   <div
                     key={streak.id}
                     className="bg-white rounded-2xl shadow-lg p-6 transition-all duration-300 hover:shadow-xl animate-slideDown"
+                    style={{
+                      borderLeft: `6px solid ${streak.color}`,
+                    }}
                   >
                     <div className="flex items-center gap-6">
                       <div className="shrink-0 w-48">
-                        <h3 className="text-2xl font-semibold text-gray-900">
-                          {streak.name}
-                        </h3>
-                        {currentStreak > 0 && (
-                          <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-linear-to-r from-red-100 to-orange-100 rounded-full">
-                            <span className="text-2xl">🔥</span>
-                            <span className="text-sm font-bold text-red-600">
-                              {currentStreak} day
-                              {currentStreak !== 1 ? "s" : ""}
-                            </span>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {/* Color indicator */}
+                          <div
+                            className="w-4 h-4 rounded-full shrink-0"
+                            style={{ backgroundColor: streak.color }}
+                          />
+                          <h3 className="text-2xl font-semibold text-gray-900">
+                            {streak.name}
+                          </h3>
+                        </div>
+                        <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-linear-to-r from-red-100 to-orange-100 rounded-full">
+                          <span className="text-2xl">🔥</span>
+                          <span className="text-sm font-bold text-red-600">
+                            {currentStreak} day
+                            {currentStreak !== 1 ? "s" : ""}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex gap-3 flex-1 justify-end">
                         {dateBoxes.map((date) => {
