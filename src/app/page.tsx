@@ -596,14 +596,14 @@ export default function Home() {
                     }}
                   >
                     <div className="flex items-center gap-6">
-                      <div className="shrink-0 w-48">
+                      <div className="shrink-0 w-80">
                         <div className="flex items-center gap-2">
                           {/* Color indicator */}
                           <div
                             className="w-4 h-4 rounded-full shrink-0"
                             style={{ backgroundColor: streak.color }}
                           />
-                          <h3 className="text-2xl font-semibold text-gray-900">
+                          <h3 className="text-xl font-semibold text-gray-900">
                             {streak.name}
                           </h3>
                         </div>
