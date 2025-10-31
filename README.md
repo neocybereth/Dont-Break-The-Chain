@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Don't Break the Chain 🔥
 
-## Getting Started
+A beautiful habit tracker inspired by Jerry Seinfeld's productivity method. Build consistent habits, track your streaks, and celebrate your progress!
 
-First, run the development server:
+## ✨ Features
 
+- 🎯 **Simple Habit Tracking** - Add habits and mark them complete each day
+- 🔥 **Streak Counter** - See your current streak with a fire emoji
+- 🎉 **Confetti Celebrations** - Get rewarded with confetti when you mark a day complete
+- 📅 **7-Day View** - See the last week at a glance
+- 🔐 **Secure Authentication** - Email/password login with Supabase Auth
+- 💾 **Auto-Save** - All your data syncs automatically to Supabase
+- 👤 **User Isolation** - Everyone sees only their own streaks
+
+## 🚀 Quick Start (5 Minutes)
+
+### 1. Set up your Supabase database
+Run the SQL from `QUICK_START.md` in your Supabase SQL Editor
+
+### 2. Add your Supabase credentials
+Update `.env.local` with your anon key
+
+### 3. Start the app
 ```bash
-npm run dev
-# or
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Visit `http://localhost:3000` and start building habits!
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**👉 See [QUICK_START.md](QUICK_START.md) for detailed instructions**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📚 Documentation
 
-## Learn More
+- **[QUICK_START.md](QUICK_START.md)** - Get up and running in 5 minutes
+- **[SUPABASE_SETUP.md](SUPABASE_SETUP.md)** - Detailed Supabase configuration
+- **Social Login** - Google, GitHub, and Apple sign-in ready to enable (see SUPABASE_SETUP.md)
 
-To learn more about Next.js, take a look at the following resources:
+## 🛠 Tech Stack
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Next.js 16** - React framework
+- **Supabase** - Database & authentication
+- **Tailwind CSS 4** - Styling
+- **TypeScript** - Type safety
+- **Canvas Confetti** - Celebration animations
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🎨 What It Looks Like
 
-## Deploy on Vercel
+- Clean, minimal interface focused on your habits
+- Beautiful gradient background (amber to red)
+- Large, clickable boxes for today's tasks
+- Smaller, disabled boxes for past days
+- Red X marker when you complete a day
+- Streak counter badge with fire emoji
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🔒 Security
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Row Level Security (RLS) ensures users only see their own data
+- Secure authentication with Supabase Auth
+- Environment variables for sensitive credentials
+- Production-ready security policies
+
+## 📝 License
+
+Built with ❤️ for building better habits
