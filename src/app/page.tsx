@@ -380,33 +380,40 @@ export default function Home() {
     }
   };
 
-  // Get ISO week number (1-53)
-  const getWeekNumber = (date: Date): number => {
-    const d = new Date(
-      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
-    );
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  // Helper function to get local date string in YYYY-MM-DD format
+  const getLocalDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   };
 
-  // Get week identifier (year-week format, e.g., "2025-01")
+  // Get the start of the week (Monday) for a given date in local timezone
+  const getWeekStart = (date: Date): Date => {
+    const d = new Date(date);
+    const day = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    // Adjust to get Monday as start of week (Sunday = 0 becomes -6, Monday = 1 becomes 0, etc.)
+    const diff = day === 0 ? -6 : 1 - day;
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
+  // Get week identifier based on the Monday of that week (in local timezone)
+  // Format: YYYY-MM-DD of the Monday
   const getWeekIdentifier = (date: Date): string => {
-    const week = getWeekNumber(date);
-    return `${date.getFullYear()}-${week.toString().padStart(2, "0")}`;
+    const weekStart = getWeekStart(date);
+    return getLocalDateString(weekStart);
   };
 
-  // Get start and end dates of a week
+  // Get start and end dates of a week from identifier
   const getWeekDates = (weekIdentifier: string): { start: Date; end: Date } => {
-    const [year, week] = weekIdentifier.split("-").map(Number);
-    const jan4 = new Date(Date.UTC(year, 0, 4));
-    const dayNum = jan4.getUTCDay() || 7;
-    const weekStart = new Date(jan4);
-    weekStart.setUTCDate(jan4.getUTCDate() - dayNum + 1 + (week - 1) * 7);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
-    return { start: weekStart, end: weekEnd };
+    // weekIdentifier is the Monday date in YYYY-MM-DD format
+    const [year, month, day] = weekIdentifier.split("-").map(Number);
+    const start = new Date(year, month - 1, day);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6); // Sunday is 6 days after Monday
+    return { start, end };
   };
 
   const getStreakCount = (
@@ -418,9 +425,9 @@ export default function Home() {
     if (frequency === "weekly") {
       const today = new Date();
       const currentWeek = getWeekIdentifier(today);
-      const lastWeek = getWeekIdentifier(
-        new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
-      );
+      const lastWeekDate = new Date(today);
+      lastWeekDate.setDate(today.getDate() - 7);
+      const lastWeek = getWeekIdentifier(lastWeekDate);
 
       let streak = 0;
       let checkWeek = currentWeek;
@@ -438,19 +445,13 @@ export default function Home() {
       }
 
       // Count consecutive weeks backward
-      const [startYear, startWeek] = checkWeek.split("-").map(Number);
-      let year = startYear;
-      let week = startWeek;
+      const checkDate = new Date(checkWeek); // Parse the Monday date
 
       while (true) {
-        const weekId = `${year}-${week.toString().padStart(2, "0")}`;
+        const weekId = getWeekIdentifier(checkDate);
         if (completedDates.has(weekId)) {
           streak++;
-          week--;
-          if (week === 0) {
-            year--;
-            week = getWeekNumber(new Date(year, 11, 28)); // Get last week of previous year
-          }
+          checkDate.setDate(checkDate.getDate() - 7); // Go back one week
         } else {
           break;
         }
@@ -458,15 +459,15 @@ export default function Home() {
 
       return streak;
     } else {
-      // Daily logic (original)
+      // Daily logic - use local timezone
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       const yesterday = new Date(today);
       yesterday.setDate(today.getDate() - 1);
 
-      const todayString = today.toISOString().split("T")[0];
-      const yesterdayString = yesterday.toISOString().split("T")[0];
+      const todayString = getLocalDateString(today);
+      const yesterdayString = getLocalDateString(yesterday);
 
       let streak = 0;
       let checkDate = new Date(today);
@@ -480,7 +481,7 @@ export default function Home() {
       }
 
       while (true) {
-        const dateString = checkDate.toISOString().split("T")[0];
+        const dateString = getLocalDateString(checkDate);
         if (completedDates.has(dateString)) {
           streak++;
           checkDate.setDate(checkDate.getDate() - 1);
@@ -499,7 +500,7 @@ export default function Home() {
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
-      boxes.push(date.toISOString().split("T")[0]);
+      boxes.push(getLocalDateString(date));
     }
     return boxes;
   };
@@ -515,7 +516,7 @@ export default function Home() {
     return boxes;
   };
 
-  const todayString = new Date().toISOString().split("T")[0];
+  const todayString = getLocalDateString(new Date());
   const dateBoxes = getDateBoxes();
 
   // Generate chains - one chain per streak wrapping around the window
@@ -1065,9 +1066,11 @@ export default function Home() {
                           let tooltip = "";
 
                           if (isWeekly) {
-                            const [, weekNum] = identifier.split("-");
-                            label = `Week ${parseInt(weekNum)}`;
                             const { start, end } = getWeekDates(identifier);
+                            label = `${start.toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })}`;
                             tooltip = `${start.toLocaleDateString("en-US", {
                               month: "short",
                               day: "numeric",
@@ -1075,9 +1078,14 @@ export default function Home() {
                               month: "short",
                               day: "numeric",
                               year: "numeric",
-                            })}`;
+                            })} (Week ending ${end.toLocaleDateString("en-US", {
+                              weekday: "short",
+                            })})`;
                           } else {
-                            const dateObj = new Date(identifier);
+                            const [year, month, day] = identifier
+                              .split("-")
+                              .map(Number);
+                            const dateObj = new Date(year, month - 1, day);
                             label = dateObj.toLocaleDateString("en-US", {
                               weekday: "short",
                             });
@@ -1235,7 +1243,7 @@ export default function Home() {
             ${isAdding ? "opacity-0 -translate-y-8" : "opacity-100"}
           `}
           >
-            <div className="w-full max-w-2xl">
+            <div className="w-full max-w-4xl">
               <div className="flex gap-4 items-center">
                 <input
                   type="text"
@@ -1262,6 +1270,13 @@ export default function Home() {
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
                 </select>
+                <button
+                  onClick={handleAddStreak}
+                  disabled={!inputValue.trim()}
+                  className="px-8 py-6 text-xl font-semibold text-white bg-green-500 rounded-2xl hover:bg-green-600 focus:outline-none focus:ring-4 focus:ring-green-100 shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-green-500"
+                >
+                  Add
+                </button>
               </div>
             </div>
           </div>
