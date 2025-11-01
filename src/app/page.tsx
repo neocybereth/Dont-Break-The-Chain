@@ -247,11 +247,6 @@ export default function Home() {
     setEditingName(streak.name);
   };
 
-  const cancelEditing = () => {
-    setEditingId(null);
-    setEditingName("");
-  };
-
   const handleStreakCardClick = (streakId: string) => {
     // Toggle selection - if already selected, deselect; otherwise select
     setSelectedStreakId(selectedStreakId === streakId ? null : streakId);
@@ -1025,8 +1020,6 @@ export default function Home() {
                               onKeyPress={(e) => {
                                 if (e.key === "Enter") {
                                   handleEditStreak(streak.id);
-                                } else if (e.key === "Escape") {
-                                  cancelEditing();
                                 }
                               }}
                               className="flex-1 px-3 py-1 text-lg font-semibold text-gray-900 border-2 border-green-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300"
@@ -1037,12 +1030,6 @@ export default function Home() {
                               className="px-3 py-1 text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition-colors"
                             >
                               Save
-                            </button>
-                            <button
-                              onClick={cancelEditing}
-                              className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-                            >
-                              Cancel
                             </button>
                           </div>
                         ) : (
