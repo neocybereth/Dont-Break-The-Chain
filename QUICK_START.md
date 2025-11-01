@@ -21,6 +21,7 @@ CREATE TABLE streaks (
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   name TEXT NOT NULL,
   completed_dates TEXT[] DEFAULT '{}',
+  frequency TEXT DEFAULT 'daily' CHECK (frequency IN ('daily', 'weekly')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
 );

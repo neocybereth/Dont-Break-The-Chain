@@ -19,6 +19,7 @@ export interface StreakData {
   id: string;
   name: string;
   completed_dates: string[];
+  frequency: "daily" | "weekly";
   created_at: string;
   updated_at: string;
 }
