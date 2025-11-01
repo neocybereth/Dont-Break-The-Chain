@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import type { DropResult } from "@hello-pangea/dnd";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,7 @@ interface Streak {
   completedDates: Set<string>;
   frequency: "daily" | "weekly";
   color?: string;
+  order: number;
 }
 
 // Color palette for streaks
@@ -92,7 +95,7 @@ export default function Home() {
         .from("streaks")
         .select("*")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("order", { ascending: true });
 
       if (error) {
         console.error("Error loading streaks:", error);
@@ -103,6 +106,7 @@ export default function Home() {
           completedDates: new Set<string>(streak.completed_dates || []),
           frequency: (streak.frequency || "daily") as "daily" | "weekly",
           color: STREAK_COLORS[index % STREAK_COLORS.length],
+          order: streak.order ?? index,
         }));
         setStreaks(loadedStreaks);
       }
@@ -149,9 +153,19 @@ export default function Home() {
           name: inputValue,
           completed_dates: [],
           frequency: frequency,
+          order: 0, // New streak goes to the top
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
+
+        // Update order of existing streaks
+        const updatePromises = streaks.map((streak, index) =>
+          supabase
+            .from("streaks")
+            .update({ order: index + 1 })
+            .eq("id", streak.id)
+        );
+        await Promise.all(updatePromises);
 
         const { data, error } = await supabase
           .from("streaks")
@@ -170,8 +184,9 @@ export default function Home() {
                 completedDates: new Set(data.completed_dates || []),
                 frequency: data.frequency as "daily" | "weekly",
                 color: STREAK_COLORS[streaks.length % STREAK_COLORS.length],
+                order: 0,
               },
-              ...streaks,
+              ...streaks.map((s, idx) => ({ ...s, order: idx + 1 })),
             ]);
             setInputValue("");
             setFrequency("daily");
@@ -250,6 +265,34 @@ export default function Home() {
   const handleStreakCardClick = (streakId: string) => {
     // Toggle selection - if already selected, deselect; otherwise select
     setSelectedStreakId(selectedStreakId === streakId ? null : streakId);
+  };
+
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+
+    const items = Array.from(streaks);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+
+    // Update local state with new order
+    const updatedItems = items.map((item, index) => ({
+      ...item,
+      order: index,
+    }));
+    setStreaks(updatedItems);
+
+    // Update database
+    try {
+      const updatePromises = updatedItems.map((streak) =>
+        supabase
+          .from("streaks")
+          .update({ order: streak.order })
+          .eq("id", streak.id)
+      );
+      await Promise.all(updatePromises);
+    } catch (err) {
+      console.error("Error updating streak order:", err);
+    }
   };
 
   const handleShareStreak = (streak: Streak) => {
@@ -976,147 +1019,220 @@ export default function Home() {
           </div>
 
           {/* Streaks List */}
-          <div className="mb-8 space-y-4">
-            {isLoading ? (
-              <div className="text-center py-12">
-                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-green-500"></div>
-                <p className="mt-4 text-gray-600">Loading your streaks...</p>
-              </div>
-            ) : (
-              streaks.map((streak) => {
-                const currentStreak = getStreakCount(
-                  streak.completedDates,
-                  streak.frequency
-                );
-                const isWeekly = streak.frequency === "weekly";
-                const boxes = isWeekly ? getWeekBoxes() : dateBoxes;
-                const currentIdentifier = isWeekly
-                  ? getWeekIdentifier(new Date())
-                  : todayString;
-
-                return (
-                  <div
-                    key={streak.id}
-                    className="bg-white rounded-2xl shadow-lg p-6 transition-all duration-300 hover:shadow-xl animate-slideDown"
-                    style={{
-                      borderLeft: `6px solid ${streak.color}`,
-                    }}
-                  >
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <div className="mb-8">
+              {isLoading ? (
+                <div className="text-center py-12">
+                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-green-500"></div>
+                  <p className="mt-4 text-gray-600">Loading your streaks...</p>
+                </div>
+              ) : (
+                <Droppable droppableId="streaks">
+                  {(provided) => (
                     <div
-                      className="flex items-center gap-6 cursor-pointer"
-                      onClick={() => handleStreakCardClick(streak.id)}
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                      className="space-y-4"
                     >
-                      <div className="shrink-0 w-80">
-                        {editingId === streak.id ? (
-                          // Edit mode
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-4 h-4 rounded-full shrink-0"
-                              style={{ backgroundColor: streak.color }}
-                            />
-                            <input
-                              type="text"
-                              value={editingName}
-                              onChange={(e) => setEditingName(e.target.value)}
-                              onKeyPress={(e) => {
-                                if (e.key === "Enter") {
-                                  handleEditStreak(streak.id);
-                                }
-                              }}
-                              className="flex-1 px-3 py-1 text-lg font-semibold text-gray-900 border-2 border-green-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300"
-                              autoFocus
-                            />
-                            <button
-                              onClick={() => handleEditStreak(streak.id)}
-                              className="px-3 py-1 text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition-colors"
-                            >
-                              Save
-                            </button>
-                          </div>
-                        ) : (
-                          // View mode
-                          <>
-                            <div className="flex items-center gap-2">
-                              {/* Color indicator */}
+                      {streaks.map((streak, index) => {
+                        const currentStreak = getStreakCount(
+                          streak.completedDates,
+                          streak.frequency
+                        );
+                        const isWeekly = streak.frequency === "weekly";
+                        const boxes = isWeekly ? getWeekBoxes() : dateBoxes;
+                        const currentIdentifier = isWeekly
+                          ? getWeekIdentifier(new Date())
+                          : todayString;
+
+                        return (
+                          <Draggable
+                            key={streak.id}
+                            draggableId={streak.id}
+                            index={index}
+                          >
+                            {(provided, snapshot) => (
                               <div
-                                className="w-4 h-4 rounded-full shrink-0"
-                                style={{ backgroundColor: streak.color }}
-                              />
-                              <h3 className="text-xl font-semibold text-gray-900">
-                                {streak.name}
-                              </h3>
-                            </div>
-                            <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-linear-to-r from-red-100 to-orange-100 rounded-full">
-                              <span className="text-2xl">🔥</span>
-                              <span className="text-sm font-bold text-red-600">
-                                {currentStreak} {isWeekly ? "week" : "day"}
-                                {currentStreak !== 1 ? "s" : ""}
-                              </span>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                      <div className="flex gap-3 flex-1 justify-end">
-                        {boxes.map((identifier) => {
-                          const isCurrent = identifier === currentIdentifier;
-                          const isCompleted =
-                            streak.completedDates.has(identifier);
-
-                          let label = "";
-                          let tooltip = "";
-
-                          if (isWeekly) {
-                            const { start, end } = getWeekDates(identifier);
-                            label = `${start.toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })}`;
-                            tooltip = `${start.toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })} - ${end.toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })} (Week ending ${end.toLocaleDateString("en-US", {
-                              weekday: "short",
-                            })})`;
-                          } else {
-                            const [year, month, day] = identifier
-                              .split("-")
-                              .map(Number);
-                            const dateObj = new Date(year, month - 1, day);
-                            label = dateObj.toLocaleDateString("en-US", {
-                              weekday: "short",
-                            });
-                            tooltip = dateObj.toLocaleDateString("en-US", {
-                              month: "long",
-                              day: "numeric",
-                              year: "numeric",
-                            });
-                          }
-
-                          return (
-                            <div
-                              key={identifier}
-                              className="flex flex-col items-center relative group"
-                            >
-                              <span className="text-xs text-gray-500 mb-1">
-                                {label}
-                              </span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation(); // Prevent card click when clicking the box
-                                  if (isCurrent) {
-                                    toggleDate(
-                                      streak.id,
-                                      identifier,
-                                      e.currentTarget
-                                    );
-                                  }
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                className="bg-white rounded-2xl shadow-lg p-6 transition-all duration-300 hover:shadow-xl animate-slideDown"
+                                style={{
+                                  borderLeft: `6px solid ${streak.color}`,
+                                  ...provided.draggableProps.style,
+                                  opacity: snapshot.isDragging ? 0.8 : 1,
                                 }}
-                                disabled={!isCurrent}
-                                className={`
+                              >
+                                <div className="flex items-center gap-3 w-full -ml-4">
+                                  {/* Drag Handle */}
+                                  <div
+                                    {...provided.dragHandleProps}
+                                    className="flex items-center justify-center cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-colors shrink-0"
+                                    title="Drag to reorder"
+                                  >
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      className="h-5 w-5"
+                                      viewBox="0 0 24 24"
+                                      fill="currentColor"
+                                    >
+                                      <circle cx="9" cy="5" r="1.5" />
+                                      <circle cx="9" cy="12" r="1.5" />
+                                      <circle cx="9" cy="19" r="1.5" />
+                                      <circle cx="15" cy="5" r="1.5" />
+                                      <circle cx="15" cy="12" r="1.5" />
+                                      <circle cx="15" cy="19" r="1.5" />
+                                    </svg>
+                                  </div>
+                                  <div
+                                    className="flex items-center gap-6 cursor-pointer flex-1"
+                                    onClick={() =>
+                                      handleStreakCardClick(streak.id)
+                                    }
+                                  >
+                                    <div className="shrink-0 w-80">
+                                      {editingId === streak.id ? (
+                                        // Edit mode
+                                        <div className="flex items-center gap-2">
+                                          <div
+                                            className="w-4 h-4 rounded-full shrink-0"
+                                            style={{
+                                              backgroundColor: streak.color,
+                                            }}
+                                          />
+                                          <input
+                                            type="text"
+                                            value={editingName}
+                                            onChange={(e) =>
+                                              setEditingName(e.target.value)
+                                            }
+                                            onKeyPress={(e) => {
+                                              if (e.key === "Enter") {
+                                                handleEditStreak(streak.id);
+                                              }
+                                            }}
+                                            className="flex-1 px-3 py-1 text-lg font-semibold text-gray-900 border-2 border-green-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300"
+                                            autoFocus
+                                          />
+                                          <button
+                                            onClick={() =>
+                                              handleEditStreak(streak.id)
+                                            }
+                                            className="px-3 py-1 text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition-colors"
+                                          >
+                                            Save
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        // View mode
+                                        <>
+                                          <div className="flex items-center gap-2">
+                                            {/* Color indicator */}
+                                            <div
+                                              className="w-4 h-4 rounded-full shrink-0"
+                                              style={{
+                                                backgroundColor: streak.color,
+                                              }}
+                                            />
+                                            <h3 className="text-xl font-semibold text-gray-900">
+                                              {streak.name}
+                                            </h3>
+                                          </div>
+                                          <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-linear-to-r from-red-100 to-orange-100 rounded-full">
+                                            <span className="text-2xl">🔥</span>
+                                            <span className="text-sm font-bold text-red-600">
+                                              {currentStreak}{" "}
+                                              {isWeekly ? "week" : "day"}
+                                              {currentStreak !== 1 ? "s" : ""}
+                                            </span>
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-3 flex-1 justify-end">
+                                      {boxes.map((identifier) => {
+                                        const isCurrent =
+                                          identifier === currentIdentifier;
+                                        const isCompleted =
+                                          streak.completedDates.has(identifier);
+
+                                        let label = "";
+                                        let tooltip = "";
+
+                                        if (isWeekly) {
+                                          const { start, end } =
+                                            getWeekDates(identifier);
+                                          label = `${start.toLocaleDateString(
+                                            "en-US",
+                                            {
+                                              month: "short",
+                                              day: "numeric",
+                                            }
+                                          )}`;
+                                          tooltip = `${start.toLocaleDateString(
+                                            "en-US",
+                                            {
+                                              month: "short",
+                                              day: "numeric",
+                                            }
+                                          )} - ${end.toLocaleDateString(
+                                            "en-US",
+                                            {
+                                              month: "short",
+                                              day: "numeric",
+                                              year: "numeric",
+                                            }
+                                          )} (Week ending ${end.toLocaleDateString(
+                                            "en-US",
+                                            {
+                                              weekday: "short",
+                                            }
+                                          )})`;
+                                        } else {
+                                          const [year, month, day] = identifier
+                                            .split("-")
+                                            .map(Number);
+                                          const dateObj = new Date(
+                                            year,
+                                            month - 1,
+                                            day
+                                          );
+                                          label = dateObj.toLocaleDateString(
+                                            "en-US",
+                                            {
+                                              weekday: "short",
+                                            }
+                                          );
+                                          tooltip = dateObj.toLocaleDateString(
+                                            "en-US",
+                                            {
+                                              month: "long",
+                                              day: "numeric",
+                                              year: "numeric",
+                                            }
+                                          );
+                                        }
+
+                                        return (
+                                          <div
+                                            key={identifier}
+                                            className="flex flex-col items-center relative group"
+                                          >
+                                            <span className="text-xs text-gray-500 mb-1">
+                                              {label}
+                                            </span>
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation(); // Prevent card click when clicking the box
+                                                if (isCurrent) {
+                                                  toggleDate(
+                                                    streak.id,
+                                                    identifier,
+                                                    e.currentTarget
+                                                  );
+                                                }
+                                              }}
+                                              disabled={!isCurrent}
+                                              className={`
                             relative transition-all duration-200
                             ${
                               isCurrent
@@ -1130,110 +1246,118 @@ export default function Home() {
                             }
                             rounded-lg
                           `}
-                              >
-                                {isCompleted && (
-                                  <svg
-                                    viewBox="0 0 100 100"
-                                    className="absolute inset-0 w-full h-full p-2"
-                                  >
-                                    <path
-                                      d="M 20 20 L 80 80 M 80 20 L 20 80"
-                                      stroke="#d1fae5"
-                                      strokeWidth="12"
-                                      strokeLinecap="round"
-                                      className="drop-shadow-lg"
-                                    />
-                                    <path
-                                      d="M 20 20 L 80 80 M 80 20 L 20 80"
-                                      stroke="#16a34a"
-                                      strokeWidth="10"
-                                      strokeLinecap="round"
-                                    />
-                                  </svg>
-                                )}
-                              </button>
-                              {/* Custom Tooltip */}
-                              {isWeekly && (
-                                <div className="absolute bottom-full mb-2 hidden group-hover:block z-50 pointer-events-none">
-                                  <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap shadow-lg">
-                                    {tooltip}
-                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-                                      <div className="border-4 border-transparent border-t-gray-900"></div>
+                                            >
+                                              {isCompleted && (
+                                                <svg
+                                                  viewBox="0 0 100 100"
+                                                  className="absolute inset-0 w-full h-full p-2"
+                                                >
+                                                  <path
+                                                    d="M 20 20 L 80 80 M 80 20 L 20 80"
+                                                    stroke="#d1fae5"
+                                                    strokeWidth="12"
+                                                    strokeLinecap="round"
+                                                    className="drop-shadow-lg"
+                                                  />
+                                                  <path
+                                                    d="M 20 20 L 80 80 M 80 20 L 20 80"
+                                                    stroke="#16a34a"
+                                                    strokeWidth="10"
+                                                    strokeLinecap="round"
+                                                  />
+                                                </svg>
+                                              )}
+                                            </button>
+                                            {/* Custom Tooltip */}
+                                            {isWeekly && (
+                                              <div className="absolute bottom-full mb-2 hidden group-hover:block z-50 pointer-events-none">
+                                                <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap shadow-lg">
+                                                  {tooltip}
+                                                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                                                    <div className="border-4 border-transparent border-t-gray-900"></div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
 
-                    {/* Edit, Share, and Delete buttons - appear below when selected */}
-                    {selectedStreakId === streak.id && (
-                      <div className="mt-4 pt-4 border-t border-gray-200 flex gap-3 justify-center animate-slideDown">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            startEditing(streak);
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-4 w-4"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                          </svg>
-                          Edit
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleShareStreak(streak);
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-4 w-4"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
-                          </svg>
-                          Share
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteStreak(streak.id);
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-4 w-4"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
+                                  {/* Edit, Share, and Delete buttons - appear below when selected */}
+                                  {selectedStreakId === streak.id && (
+                                    <div className="mt-4 pt-4 border-t border-gray-200 flex gap-3 justify-center animate-slideDown">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          startEditing(streak);
+                                        }}
+                                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                      >
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          className="h-4 w-4"
+                                          viewBox="0 0 20 20"
+                                          fill="currentColor"
+                                        >
+                                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                        </svg>
+                                        Edit
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleShareStreak(streak);
+                                        }}
+                                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
+                                      >
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          className="h-4 w-4"
+                                          viewBox="0 0 20 20"
+                                          fill="currentColor"
+                                        >
+                                          <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
+                                        </svg>
+                                        Share
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteStreak(streak.id);
+                                        }}
+                                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                                      >
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          className="h-4 w-4"
+                                          viewBox="0 0 20 20"
+                                          fill="currentColor"
+                                        >
+                                          <path
+                                            fillRule="evenodd"
+                                            d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                                            clipRule="evenodd"
+                                          />
+                                        </svg>
+                                        Delete
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </Draggable>
+                        );
+                      })}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              )}
+            </div>
+          </DragDropContext>
 
           {/* Input Field */}
           <div
