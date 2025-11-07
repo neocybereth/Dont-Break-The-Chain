@@ -1223,21 +1223,18 @@ export default function Home() {
                                             <button
                                               onClick={(e) => {
                                                 e.stopPropagation(); // Prevent card click when clicking the box
-                                                if (isCurrent) {
-                                                  toggleDate(
-                                                    streak.id,
-                                                    identifier,
-                                                    e.currentTarget
-                                                  );
-                                                }
+                                                toggleDate(
+                                                  streak.id,
+                                                  identifier,
+                                                  e.currentTarget
+                                                );
                                               }}
-                                              disabled={!isCurrent}
                                               className={`
-                            relative transition-all duration-200
+                            relative transition-all duration-200 cursor-pointer
                             ${
                               isCurrent
-                                ? "w-16 h-16 cursor-pointer hover:scale-110"
-                                : "w-12 h-12 cursor-not-allowed opacity-60"
+                                ? "w-16 h-16 hover:scale-110"
+                                : "w-12 h-12 hover:scale-105"
                             }
                             ${
                               isCompleted
